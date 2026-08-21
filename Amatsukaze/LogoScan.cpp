@@ -1905,6 +1905,41 @@ void logo::LogoFrame::writeResult(const tstring& outpath, int logoIndex) {
         logoIndex = bestLogo;
     }
 
+    std::vector<float> rawScores(numFrames);
+    for (int n = 0; n < numFrames; n++) {
+        auto& r = evalResults[n * numLogos + logoIndex];
+        // corr0のマイナスとcorr1のプラスはノイズなので消す
+        rawScores[n] = std::max(0.0f, r.corr0) + std::min(0.0f, r.corr1);
+    }
+    writeResultFromRawScores(outpath, rawScores);
+}
+
+// logoIndicesに指定した複数ロゴの検出結果を統合(OR)してlogoframeファイルを出力
+// 各フレームについて、指定した候補のうち最もロゴらしいスコア(max)を採用する。
+// これにより「濃いロゴ」「薄いロゴ」のように同じ局の別バリエーションを複数登録し、
+// どちらか一方でも検出できればロゴありとして扱うことができる。
+void logo::LogoFrame::writeResultMerged(const tstring& outpath, const std::vector<int>& logoIndices) {
+    std::vector<float> rawScores(numFrames, 0.0f);
+    if (logoIndices.empty()) {
+        // 対象がなければ全フレーム「ロゴなし」として出力する
+        writeResultFromRawScores(outpath, rawScores);
+        return;
+    }
+    for (int n = 0; n < numFrames; n++) {
+        float best = -INFINITY;
+        for (int logoIndex : logoIndices) {
+            auto& r = evalResults[n * numLogos + logoIndex];
+            // corr0のマイナスとcorr1のプラスはノイズなので消す
+            const float s = std::max(0.0f, r.corr0) + std::min(0.0f, r.corr1);
+            // 複数ロゴのうち、そのフレームで最もロゴらしい(スコアが高い)ものを採用 = OR統合
+            best = std::max(best, s);
+        }
+        rawScores[n] = best;
+    }
+    writeResultFromRawScores(outpath, rawScores);
+}
+
+void logo::LogoFrame::writeResultFromRawScores(const tstring& outpath, std::vector<float>& rawScores) {
     const float threshL = 0.5f; // MinMax評価用
     // MinMax幅
     const float avgDur = 1.0f;
@@ -1912,12 +1947,6 @@ void logo::LogoFrame::writeResult(const tstring& outpath, int logoIndex) {
 
     // スコアに変換
     const auto smoothing = MakeLogoPresenceSmoothingConfig(framesPerSec, THRESH, threshL, avgDur, medianDur);
-    std::vector<float> rawScores(numFrames);
-    for (int n = 0; n < numFrames; n++) {
-        auto& r = evalResults[n * numLogos + logoIndex];
-        // corr0のマイナスとcorr1のプラスはノイズなので消す
-        rawScores[n] = std::max(0.0f, r.corr0) + std::min(0.0f, r.corr1);
-    }
     std::vector<float> paddedRawScores;
     std::vector<LogoPresenceFrameResult> frameResult;
     BuildLogoPresenceSeries(rawScores, smoothing, paddedRawScores, frameResult);

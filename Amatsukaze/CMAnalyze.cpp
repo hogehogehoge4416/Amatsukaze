@@ -493,7 +493,19 @@ void CMAnalyze::logoFrame(const int videoFileIndex, const VideoFormat& inputForm
         logof.dumpResult(setting_.getTmpLogoFramePath(videoFileIndex));
 #endif
         logof.selectLogo(trims, (int)logoPath.size());
-        logof.writeResult(setting_.getTmpLogoFramePath(videoFileIndex));
+
+        if (logoPath.size() > 1) {
+            // 複数のロゴ候補(例: 同じ局の「濃いロゴ」「薄いロゴ」)が登録されている場合は、
+            // 1つを選ぶのではなく、いずれかが検出できたフレームを「ロゴあり」として統合(OR)する。
+            std::vector<int> mergeIndices;
+            mergeIndices.reserve(logoPath.size());
+            for (int i = 0; i < (int)logoPath.size(); i++) {
+                mergeIndices.push_back(i);
+            }
+            logof.writeResultMerged(setting_.getTmpLogoFramePath(videoFileIndex), mergeIndices);
+        } else {
+            logof.writeResult(setting_.getTmpLogoFramePath(videoFileIndex));
+        }
 
         float threshold = setting_.isLooseLogoDetection() ? 0.03f : (duration <= 60 * 7) ? 0.03f : 0.1f;
         if (logof.getLogoRatio() < threshold) {

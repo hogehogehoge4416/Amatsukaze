@@ -982,6 +982,10 @@ class LogoFrame : AMTObject {
     // targetFramesの指定がない場合(-1)は、すべてのフレームから検索
     std::vector<LogoScore> calcLogoScore(const std::vector<std::pair<int, int>>& range, int numCandidates) const;
 
+    // rawScores(フレームごとのロゴらしさスコア)からロゴ区間を判定してoutpathに書き出す
+    // writeResult / writeResultMerged の共通処理
+    void writeResultFromRawScores(const tstring& outpath, std::vector<float>& rawScores);
+
 public:
     LogoFrame(AMTContext& ctx, const std::vector<tstring>& logofiles, float maskratio);
 
@@ -1003,6 +1007,11 @@ public:
     // logoIndexに指定したロゴのlogoframeファイルを出力
     // logoIndexの指定がない場合(-1)は、bestLogoを出力
     void writeResult(const tstring& outpath, int logoIndex = -1);
+
+    // logoIndicesに指定した複数ロゴの検出結果を統合(OR)してlogoframeファイルを出力
+    // いずれか1つのロゴがそのフレームで検出されていれば「ロゴあり」として扱う
+    // (例: 同じ局の「濃いロゴ」「薄いロゴ」を両方登録し、どちらかが検出できればOKにしたい場合)
+    void writeResultMerged(const tstring& outpath, const std::vector<int>& logoIndices);
 
     int getBestLogo() const;
 
